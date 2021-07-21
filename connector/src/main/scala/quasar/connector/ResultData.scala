@@ -18,7 +18,7 @@ package quasar.connector
 
 import slamdata.Predef._
 import quasar.api.push
-import quasar.common.data.RValue
+import quasar.common.data.CValue
 
 import cats._
 import cats.implicits._
@@ -36,7 +36,7 @@ object ResultData {
   sealed trait Part[+A] extends Product with Serializable {
     def fold[B](
         f1: push.ExternalOffsetKey => B,
-        f2: Option[RValue] => B,
+        f2: Option[Map[String, CValue]] => B,
         f3: Chunk[A] => B)
         : B =
       this match {
@@ -48,7 +48,7 @@ object ResultData {
 
   sealed trait DataPart[+A] extends Part[A] {
     def foldData[B](
-        f1: Option[RValue] => B,
+        f1: Option[Map[String, CValue]] => B,
         f2: Chunk[A] => B)
         : B =
       this match {
@@ -67,23 +67,36 @@ object ResultData {
 
     /**
       * Contextual data pertinent to the output that follows, until another context data annotation is encountered
-      * e.g. Stream(C1, O1, O2, C2, O3, C4, C5, O4)
+      * e.g. Stream(C1, O1, O2, C2, O3, C4, C5, O4).
       *
       * C1 pertains to O1 and O2
       * C2 pertains to O3
       * C4 pertains to nothing
       * C5 pertains to O4
       *
-      * @param fields
+      * Note: Currently this contextual data is limited to `Map[String, CValue]` instead of any `RValue` because this
+      * is what the frontend can handle (it is interpreting the context as identity fields).
+      * The backend would be able to handle any `RValue`.
+      *
+      * @param value The context to set. A value of `None` means that there is no context and the output that follows
+      * will not be wrapped. In case of a context of `Some` the output that follows will be wrapped, even if the `Map`
+      * of fields is empty.
       */
-    final case class ContextualData(value: Option[RValue]) extends DataPart[Nothing]
+    final case class ContextualData(value: Option[Map[String, CValue]]) extends DataPart[Nothing]
 
     final case class Output[A](chunk: Chunk[A]) extends DataPart[A]
 
-    implicit def functorPart: Functor[Part] = new Functor[Part] {
+    implicit val functorPart: Functor[Part] = new Functor[Part] {
       def map[A, B](fa: Part[A])(f: A => B): Part[B] = fa match {
         case Output(c) => Output(c.map(f))
         case e @ ExternalOffsetKey(_) => e
+        case c @ ContextualData(_) => c
+      }
+    }
+
+    implicit val functorDataPart: Functor[DataPart] = new Functor[DataPart] {
+      def map[A, B](fa: DataPart[A])(f: A => B): DataPart[B] = fa match {
+        case Output(c) => Output(c.map(f))
         case c @ ContextualData(_) => c
       }
     }
