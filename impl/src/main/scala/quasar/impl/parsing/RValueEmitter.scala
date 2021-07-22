@@ -25,7 +25,7 @@ import scala.util.control.TailCalls._
 
 import tectonic.Plate
 
-class RValueEmitter[A](plate: Plate[A]) {
+class RValueEmitter[A](plate: Plate[A]) extends ValueEmitter[RValue] {
 
   def emit(rv: RValue): Unit = emitRec(rv).result
 

@@ -32,7 +32,7 @@ object AddContextPlateSpec extends Specification {
 
   def mkPlate() = {
     val reified = ReifiedTerminalPlate[IO](true).unsafeRunSync()
-    AddContextPlate[IO, List[Event]]("ctx", "out", reified).unsafeRunSync()
+    AddContextPlate[IO, List[Event], RValue]("ctx", "out", reified, new RValueEmitter(_)).unsafeRunSync()
   }
 
   "AddContextPlate" should {
@@ -41,14 +41,14 @@ object AddContextPlateSpec extends Specification {
 
       "does not add anything when no output" in {
         val plate = mkPlate()
-        plate.setRValue(Some(CString("some context")))
+        plate.setValue(Some(CString("some context")))
 
         plate.finishBatch(true) mustEqual List.empty
       }
 
       "adds context and wraps output when output" in {
         val plate = mkPlate()
-        plate.setRValue(Some(CString("some context")))
+        plate.setValue(Some(CString("some context")))
 
         plate.str("some output")
         plate.finishRow()
@@ -65,7 +65,7 @@ object AddContextPlateSpec extends Specification {
 
       "adds context and wraps output for every row" in {
         val plate = mkPlate()
-        plate.setRValue(Some(CString("some context")))
+        plate.setValue(Some(CString("some context")))
 
         plate.str("output row 1")
         plate.finishRow()
@@ -93,12 +93,12 @@ object AddContextPlateSpec extends Specification {
 
       "picks up changes in context" in {
         val plate = mkPlate()
-        plate.setRValue(Some(CString("some context")))
+        plate.setValue(Some(CString("some context")))
 
         plate.str("output row 1")
         plate.finishRow()
 
-        plate.setRValue(Some(CString("other context")))
+        plate.setValue(Some(CString("other context")))
 
         plate.str("output row 2")
         plate.finishRow()
@@ -123,11 +123,11 @@ object AddContextPlateSpec extends Specification {
 
       "changing context does not affect already started row" in {
         val plate = mkPlate()
-        plate.setRValue(Some(CString("some context")))
+        plate.setValue(Some(CString("some context")))
 
         plate.nestMap("nested")
 
-        plate.setRValue(Some(CString("other context")))
+        plate.setValue(Some(CString("other context")))
 
         plate.str("output row 1")
         plate.unnest()
@@ -199,7 +199,7 @@ object AddContextPlateSpec extends Specification {
         plate.str("output row 1")
         plate.finishRow()
 
-        plate.setRValue(Some(CString("other context")))
+        plate.setValue(Some(CString("other context")))
 
         plate.str("output row 2")
         plate.finishRow()
@@ -222,7 +222,7 @@ object AddContextPlateSpec extends Specification {
 
         plate.nestMap("nested")
 
-        plate.setRValue(Some(CString("other context")))
+        plate.setValue(Some(CString("other context")))
 
         plate.str("output row 1")
         plate.unnest()
@@ -258,7 +258,7 @@ object AddContextPlateSpec extends Specification {
     "deep object should not stack overflow" in {
       val plate = mkPlate()
       val nesting = 10000
-      plate.setRValue(Some(mkObj(CString("q"), nesting)))
+      plate.setValue(Some(mkObj(CString("q"), nesting)))
 
       plate.str("some output")
       plate.finishRow()
@@ -289,7 +289,7 @@ object AddContextPlateSpec extends Specification {
     "deep array should not stack overflow" in {
       val plate = mkPlate()
       val nesting = 10000
-      plate.setRValue(Some(mkArr(CString("q"), nesting)))
+      plate.setValue(Some(mkArr(CString("q"), nesting)))
 
       plate.str("some output")
       plate.finishRow()

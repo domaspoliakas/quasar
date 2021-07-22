@@ -18,25 +18,23 @@ package quasar.impl.parsing
 
 import slamdata.Predef._
 
-import quasar.common.data.RValue
-
 import java.lang.CharSequence
 
 import cats.effect.{IO, Sync}
 
 import tectonic.{Plate, Signal}
 
-final class AddContextPlate[A] private (contextKeyName: String, outputKeyName: String, delegate: Plate[A]) extends Plate[A] {
+final class AddContextPlate[A, B] private (contextKeyName: String, outputKeyName: String, delegate: Plate[A], emitter: Plate[A] => ValueEmitter[B]) extends Plate[A] {
 
-  private val rValueEmitter = new RValueEmitter[A](delegate)
+  private val valueEmitter: ValueEmitter[B] = emitter(delegate)
   private val wrapDelegate = WrapPlate[IO, A](outputKeyName, delegate).unsafeRunSync()
 
   private[this] var sawNewRow = false
-  private[this] var rValue: Option[RValue] = None
+  private[this] var value: Option[B] = None
   private[this] var currentDelegate: Plate[A] = delegate
 
-  def setRValue(rv: Option[RValue]): Unit =
-    this.rValue = rv
+  def setValue(v: Option[B]): Unit =
+    this.value = v
 
   def nul(): Signal = {
     emitOnNewRow()
@@ -107,15 +105,15 @@ final class AddContextPlate[A] private (contextKeyName: String, outputKeyName: S
   private[this] def emitOnNewRow(): Unit = {
     if (!sawNewRow) {
       sawNewRow = true
-      rValue match {
+      value match {
         case None =>
           currentDelegate = delegate
 
-        case Some(rv) =>
+        case Some(v) =>
           currentDelegate = wrapDelegate
 
           delegate.nestMap(contextKeyName)
-          rValueEmitter.emit(rv)
+          valueEmitter.emit(v)
           delegate.unnest()
           ()
       }
@@ -124,6 +122,13 @@ final class AddContextPlate[A] private (contextKeyName: String, outputKeyName: S
 }
 
 object AddContextPlate {
-  def apply[F[_]: Sync, A](contextKeyName: String, outputKeyName: String, delegate: Plate[A]): F[AddContextPlate[A]] =
-    Sync[F].delay(new AddContextPlate(contextKeyName, outputKeyName, delegate))
+
+  val PrecogContextKey = "precog_context_0c67cf80-b43f-45dd-9a8e-6382dbcff935"
+  val PrecogOutputKey = "precog_output_bca7ccb9-87d6-443b-969f-6f287314b26d"
+
+  def apply[F[_]: Sync, A, B](contextKeyName: String, outputKeyName: String, delegate: Plate[A], emitter: Plate[A] => ValueEmitter[B]): F[AddContextPlate[A, B]] =
+    Sync[F].delay(new AddContextPlate(contextKeyName, outputKeyName, delegate, emitter))
+
+  def mk[F[_]: Sync, A, B](delegate: Plate[A], emitter: Plate[A] => ValueEmitter[B]): F[AddContextPlate[A, B]] =
+    apply(PrecogContextKey, PrecogOutputKey, delegate, emitter)
 }
