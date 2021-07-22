@@ -19,6 +19,7 @@ package quasar.impl.parsing
 import slamdata.Predef._
 
 import quasar.common.data._
+import quasar.contrib.std
 
 import scala.util.control.TailCalls._
 
@@ -30,18 +31,18 @@ class RValueEmitter[A](plate: Plate[A]) {
 
   private def emitRec(rv: RValue): TailRec[Unit] = {
     rv match {
-      case CNull => done(plate.nul())
-      case CBoolean(b) => done(if (b) plate.tru() else plate.fls())
-      case CString(s) => done(plate.str(s))
-      case CLong(l) => done(plate.num(l.toString, -1, -1))
-      case CDouble(d) => done(emitNum(d.toString))
-      case CNum(n) => done(emitNum(n.toString))
+      case CNull => done { plate.nul(); () }
+      case CBoolean(b) => done { if (b) plate.tru() else plate.fls(); () }
+      case CString(s) => done { plate.str(s); () }
+      case CLong(l) => done { plate.num(l.toString, -1, -1); () }
+      case CDouble(d) => done { emitNum(d.toString); () }
+      case CNum(n) => done { emitNum(n.toString); () }
       case RObject(o) => emitEntries(o.toList)
       case RArray(a) => emitAll(a)
-      case CEmptyObject => done(plate.map())
-      case CEmptyArray => done(plate.arr())
+      case CEmptyObject => done { plate.map(); () }
+      case CEmptyArray => done { plate.arr(); () }
 
-      case _ => done(())
+      case _ => std.errorNotImplemented
       // case RMeta(_, _) => ()
       // case COffsetDateTime(_) => ()
       // case COffsetDate(_) => ()

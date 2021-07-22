@@ -103,6 +103,7 @@ private final class WrapPlate[A] private (
     if (!seenSomething) {
       seenSomething = true
       delegate.nestMap(keyName)
+      ()
     }
   }
 
@@ -110,6 +111,7 @@ private final class WrapPlate[A] private (
     if (seenSomething) {
       seenSomething = false
       delegate.unnest()
+      ()
     }
   }
 }

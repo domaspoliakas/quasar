@@ -308,6 +308,7 @@ lazy val impl = project
       // if it is not added here then no HttpClientProvider implementation can be found.
       // See ch11286.
       "com.azure" % "azure-core-http-netty" % "1.6.3",
+      "com.precog"    %% "tectonic-test" % tectonicVersion.value % Test,
       "org.http4s"    %% "http4s-dsl" % http4sVersion  % Test,
       "org.typelevel" %% "discipline-specs2" % disciplineVersion % Test,
       "org.typelevel" %% "kittens" % kittensVersion % Test))

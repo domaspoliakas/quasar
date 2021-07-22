@@ -117,6 +117,7 @@ final class AddContextPlate[A] private (contextKeyName: String, outputKeyName: S
           delegate.nestMap(contextKeyName)
           rValueEmitter.emit(rv)
           delegate.unnest()
+          ()
       }
     }
   }
