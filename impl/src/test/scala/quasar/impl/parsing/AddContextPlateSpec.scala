@@ -20,8 +20,6 @@ import slamdata.Predef._
 
 import quasar.common.data._
 
-import scala.annotation.tailrec
-
 import cats.effect.IO
 
 import org.specs2.mutable.Specification
@@ -32,7 +30,7 @@ object AddContextPlateSpec extends Specification {
 
   def mkPlate() = {
     val reified = ReifiedTerminalPlate[IO](true).unsafeRunSync()
-    AddContextPlate[IO, List[Event], RValue]("ctx", "out", reified, new RValueEmitter(_)).unsafeRunSync()
+    AddContextPlate[IO, List[Event], Map[String, CValue]]("ctx", "out", reified, new CValueMapEmitter(_)).unsafeRunSync()
   }
 
   "AddContextPlate" should {
@@ -41,21 +39,23 @@ object AddContextPlateSpec extends Specification {
 
       "does not add anything when no output" in {
         val plate = mkPlate()
-        plate.setValue(Some(CString("some context")))
+        plate.setValue(Some(Map("id" -> CString("hi"))))
 
         plate.finishBatch(true) mustEqual List.empty
       }
 
       "adds context and wraps output when output" in {
         val plate = mkPlate()
-        plate.setValue(Some(CString("some context")))
+        plate.setValue(Some(Map("id" -> CString("hi"))))
 
         plate.str("some output")
         plate.finishRow()
 
         plate.finishBatch(true) mustEqual List(
           Event.NestMap("ctx"),
-          Event.Str("some context"),
+          Event.NestMap("id"),
+          Event.Str("hi"),
+          Event.Unnest,
           Event.Unnest,
           Event.NestMap("out"),
           Event.Str("some output"),
@@ -65,7 +65,7 @@ object AddContextPlateSpec extends Specification {
 
       "adds context and wraps output for every row" in {
         val plate = mkPlate()
-        plate.setValue(Some(CString("some context")))
+        plate.setValue(Some(Map("id" -> CString("hi"))))
 
         plate.str("output row 1")
         plate.finishRow()
@@ -75,7 +75,9 @@ object AddContextPlateSpec extends Specification {
 
         plate.finishBatch(true) mustEqual List(
           Event.NestMap("ctx"),
-          Event.Str("some context"),
+          Event.NestMap("id"),
+          Event.Str("hi"),
+          Event.Unnest,
           Event.Unnest,
           Event.NestMap("out"),
           Event.Str("output row 1"),
@@ -83,7 +85,9 @@ object AddContextPlateSpec extends Specification {
           Event.FinishRow,
 
           Event.NestMap("ctx"),
-          Event.Str("some context"),
+          Event.NestMap("id"),
+          Event.Str("hi"),
+          Event.Unnest,
           Event.Unnest,
           Event.NestMap("out"),
           Event.Str("output row 2"),
@@ -93,19 +97,21 @@ object AddContextPlateSpec extends Specification {
 
       "picks up changes in context" in {
         val plate = mkPlate()
-        plate.setValue(Some(CString("some context")))
+        plate.setValue(Some(Map("id" -> CString("hi"))))
 
         plate.str("output row 1")
         plate.finishRow()
 
-        plate.setValue(Some(CString("other context")))
+        plate.setValue(Some(Map("id" -> CString("bye"))))
 
         plate.str("output row 2")
         plate.finishRow()
 
         plate.finishBatch(true) mustEqual List(
           Event.NestMap("ctx"),
-          Event.Str("some context"),
+          Event.NestMap("id"),
+          Event.Str("hi"),
+          Event.Unnest,
           Event.Unnest,
           Event.NestMap("out"),
           Event.Str("output row 1"),
@@ -113,7 +119,9 @@ object AddContextPlateSpec extends Specification {
           Event.FinishRow,
 
           Event.NestMap("ctx"),
-          Event.Str("other context"),
+          Event.NestMap("id"),
+          Event.Str("bye"),
+          Event.Unnest,
           Event.Unnest,
           Event.NestMap("out"),
           Event.Str("output row 2"),
@@ -123,11 +131,11 @@ object AddContextPlateSpec extends Specification {
 
       "changing context does not affect already started row" in {
         val plate = mkPlate()
-        plate.setValue(Some(CString("some context")))
+        plate.setValue(Some(Map("id" -> CString("hi"))))
 
         plate.nestMap("nested")
 
-        plate.setValue(Some(CString("other context")))
+        plate.setValue(Some(Map("id" -> CString("bye"))))
 
         plate.str("output row 1")
         plate.unnest()
@@ -138,7 +146,9 @@ object AddContextPlateSpec extends Specification {
 
         plate.finishBatch(true) mustEqual List(
           Event.NestMap("ctx"),
-          Event.Str("some context"),
+          Event.NestMap("id"),
+          Event.Str("hi"),
+          Event.Unnest,
           Event.Unnest,
           Event.NestMap("out"),
           Event.NestMap("nested"),
@@ -148,7 +158,9 @@ object AddContextPlateSpec extends Specification {
           Event.FinishRow,
 
           Event.NestMap("ctx"),
-          Event.Str("other context"),
+          Event.NestMap("id"),
+          Event.Str("bye"),
+          Event.Unnest,
           Event.Unnest,
           Event.NestMap("out"),
           Event.Str("output row 2"),
@@ -199,7 +211,7 @@ object AddContextPlateSpec extends Specification {
         plate.str("output row 1")
         plate.finishRow()
 
-        plate.setValue(Some(CString("other context")))
+        plate.setValue(Some(Map("id" -> CString("hi"))))
 
         plate.str("output row 2")
         plate.finishRow()
@@ -209,7 +221,9 @@ object AddContextPlateSpec extends Specification {
           Event.FinishRow,
 
           Event.NestMap("ctx"),
-          Event.Str("other context"),
+          Event.NestMap("id"),
+          Event.Str("hi"),
+          Event.Unnest,
           Event.Unnest,
           Event.NestMap("out"),
           Event.Str("output row 2"),
@@ -222,7 +236,7 @@ object AddContextPlateSpec extends Specification {
 
         plate.nestMap("nested")
 
-        plate.setValue(Some(CString("other context")))
+        plate.setValue(Some(Map("id" -> CString("hi"))))
 
         plate.str("output row 1")
         plate.unnest()
@@ -238,78 +252,15 @@ object AddContextPlateSpec extends Specification {
           Event.FinishRow,
 
           Event.NestMap("ctx"),
-          Event.Str("other context"),
+          Event.NestMap("id"),
+          Event.Str("hi"),
+          Event.Unnest,
           Event.Unnest,
           Event.NestMap("out"),
           Event.Str("output row 2"),
           Event.Unnest,
           Event.FinishRow)
       }
-    }
-  }
-
-  "deep structures" in {
-
-    @tailrec
-    def mkObj(rv: RValue, i: Int): RValue =
-      if (i <= 0) rv
-      else mkObj(RObject(Map("a" -> rv)), i - 1)
-
-    "deep object should not stack overflow" in {
-      val plate = mkPlate()
-      val nesting = 10000
-      plate.setValue(Some(mkObj(CString("q"), nesting)))
-
-      plate.str("some output")
-      plate.finishRow()
-
-      val nests = List.fill(nesting)(Event.NestMap("a"))
-      val unnests = List.fill(nesting + 1)(Event.Unnest)
-
-      val expected =
-        List(Event.NestMap("ctx")) ++
-          nests ++
-          List(Event.Str("q")) ++
-          unnests ++
-          List(
-            Event.NestMap("out"),
-            Event.Str("some output"),
-            Event.Unnest,
-            Event.FinishRow)
-
-      //plate.finishBatch(true) mustEqual expected
-      plate.finishBatch(true).size mustEqual expected.size
-    }
-
-    @tailrec
-    def mkArr(rv: RValue, i: Int): RValue =
-      if (i <= 0) rv
-      else mkArr(RArray(rv), i - 1)
-
-    "deep array should not stack overflow" in {
-      val plate = mkPlate()
-      val nesting = 10000
-      plate.setValue(Some(mkArr(CString("q"), nesting)))
-
-      plate.str("some output")
-      plate.finishRow()
-
-      val nests = List.fill(nesting)(Event.NestArr)
-      val unnests = List.fill(nesting + 1)(Event.Unnest)
-
-      val expected =
-        List(Event.NestMap("ctx")) ++
-          nests ++
-          List(Event.Str("q")) ++
-          unnests ++
-          List(
-            Event.NestMap("out"),
-            Event.Str("some output"),
-            Event.Unnest,
-            Event.FinishRow)
-
-      // plate.finishBatch(true) mustEqual expected
-      plate.finishBatch(true).size mustEqual expected.size
     }
   }
 }
