@@ -25,10 +25,8 @@ import tectonic.Plate
 
 class CValueMapEmitter[A](plate: Plate[A]) extends ValueEmitter[Map[String, CValue]] {
 
-  def emit(m: Map[String, CValue]): Unit = emitEntries(m.toList)
-
-  private def emitEntries(l: List[(String, CValue)]): Unit =
-    l.foreach { case (fld, value) =>
+  def emit(m: Map[String, CValue]): Unit =
+    m.foreach { case (fld, value) =>
       plate.nestMap(fld)
       emitCValue(value)
       plate.unnest()
