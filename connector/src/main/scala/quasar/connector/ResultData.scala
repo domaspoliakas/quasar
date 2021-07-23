@@ -41,7 +41,7 @@ object ResultData {
         : B =
       this match {
         case Part.ExternalOffsetKey(k) => f1(k)
-        case Part.ContextualData(d) => f2(d)
+        case Part.ExternalIdentities(e) => f2(e)
         case Part.Output(c) => f3(c)
       }
   }
@@ -52,7 +52,7 @@ object ResultData {
         f2: Chunk[A] => B)
         : B =
       this match {
-        case Part.ContextualData(d) => f1(d)
+        case Part.ExternalIdentities(e) => f1(e)
         case Part.Output(c) => f2(c)
       }
   }
@@ -66,23 +66,19 @@ object ResultData {
       ExternalOffsetKey(push.ExternalOffsetKey(bytes))
 
     /**
-      * Contextual data pertinent to the output that follows, until another context data annotation is encountered
-      * e.g. Stream(C1, O1, O2, C2, O3, C4, C5, O4).
+      * External identities pertinent to the output that follows, until another external identity annotation is
+      * encountered e.g. Stream(E1, O1, O2, E2, O3, E3, E4, O4).
       *
-      * C1 pertains to O1 and O2
-      * C2 pertains to O3
-      * C4 pertains to nothing
-      * C5 pertains to O4
+      * E1 pertains to O1 and O2
+      * E2 pertains to O3
+      * E3 pertains to nothing
+      * E4 pertains to O4
       *
-      * Note: Currently this contextual data is limited to `Map[String, CValue]` instead of any `RValue` because this
-      * is what the frontend can handle (it is interpreting the context as identity fields).
-      * The backend would be able to handle any `RValue`.
-      *
-      * @param value The context to set. A value of `None` means that there is no context and the output that follows
+      * @param value The external identities to set. A value of `None` means that there are no ids and the output that follows
       * will not be wrapped. In case of a context of `Some` the output that follows will be wrapped, even if the `Map`
       * of fields is empty.
       */
-    final case class ContextualData(value: Option[Map[String, CValue]]) extends DataPart[Nothing]
+    final case class ExternalIdentities(value: Option[Map[String, CValue]]) extends DataPart[Nothing]
 
     final case class Output[A](chunk: Chunk[A]) extends DataPart[A]
 
@@ -90,14 +86,14 @@ object ResultData {
       def map[A, B](fa: Part[A])(f: A => B): Part[B] = fa match {
         case Output(c) => Output(c.map(f))
         case e @ ExternalOffsetKey(_) => e
-        case c @ ContextualData(_) => c
+        case e @ ExternalIdentities(_) => e
       }
     }
 
     implicit val functorDataPart: Functor[DataPart] = new Functor[DataPart] {
       def map[A, B](fa: DataPart[A])(f: A => B): DataPart[B] = fa match {
         case Output(c) => Output(c.map(f))
-        case c @ ContextualData(_) => c
+        case e @ ExternalIdentities(_) => e
       }
     }
   }
